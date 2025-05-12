@@ -2,7 +2,7 @@
 
 # dependencies
 /node_modules
-
+/backoffice_API_CORRECT
 # next.js
 /.next/
 /out/
