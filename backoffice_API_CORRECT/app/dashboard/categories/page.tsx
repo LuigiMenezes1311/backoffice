@@ -1,39 +1,60 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Search, Eye } from "lucide-react"
+import { Plus, Search, Eye } from "lucide-react"
+import { getCategories, type Category } from "@/lib/api-client"
 import { useToast } from "@/components/ui/use-toast"
-import { getOffers, type Offer } from "@/lib/api-client"
-import { useApiQuery } from "@/hooks/use-api-query"
 
-export default function OffersPage() {
+export default function CategoriesPage() {
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const router = useRouter()
   const { toast } = useToast()
 
-  const { data: offers = [], isLoading } = useApiQuery<Offer[]>(getOffers)
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const data = await getCategories()
+        setCategories(data)
+      } catch (error) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar as categorias.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  const filteredOffers = offers.filter(
-    (offer) =>
-      offer.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      offer.leadName.toLowerCase().includes(searchTerm.toLowerCase()),
+    loadCategories()
+  }, [toast])
+
+  const filteredCategories = categories.filter(
+    (category) =>
+      category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      category.description.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
   return (
     <div className="grid gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Ofertas</h1>
+        <h1 className="text-3xl font-bold">Categorias</h1>
+        <Button onClick={() => router.push("/dashboard/categories/new")}>
+          <Plus className="mr-2 h-4 w-4" />
+          Nova Categoria
+        </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Ofertas</CardTitle>
+          <CardTitle>Lista de Categorias</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="mb-4">
@@ -41,7 +62,7 @@ export default function OffersPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Buscar ofertas..."
+                placeholder="Buscar categorias..."
                 className="pl-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -49,7 +70,7 @@ export default function OffersPage() {
             </div>
           </div>
 
-          {isLoading ? (
+          {loading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
@@ -58,43 +79,31 @@ export default function OffersPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>ID da Oferta</TableHead>
-                    <TableHead>Lead</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Data de Criação</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Descrição</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredOffers.length === 0 ? (
+                  {filteredCategories.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                        Nenhuma oferta encontrada.
+                      <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                        Nenhuma categoria encontrada.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredOffers.map((offer) => (
-                      <TableRow key={offer.id}>
-                        <TableCell className="font-medium">{offer.id}</TableCell>
-                        <TableCell>{offer.leadName}</TableCell>
-                        <TableCell>
-                          <Badge variant={offer.status === "CONVERTED" ? "default" : "secondary"}>
-                            {offer.status === "CONVERTED" ? "Convertido" : "Em Aberto"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{offer.type === "ONE_TIME" ? "Único" : "Recorrente"}</TableCell>
-                        <TableCell>R$ {offer.total.toFixed(2)}</TableCell>
-                        <TableCell>{new Date(offer.createdAt).toLocaleString()}</TableCell>
+                    filteredCategories.map((category) => (
+                      <TableRow key={category.id}>
+                        <TableCell className="font-medium">{category.name}</TableCell>
+                        <TableCell>{category.description}</TableCell>
                         <TableCell className="text-right">
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => router.push(`/dashboard/offers/${offer.id}`)}
+                            onClick={() => router.push(`/dashboard/categories/${category.id}`)}
                           >
                             <Eye className="h-4 w-4" />
-                            <span className="sr-only">Ver Detalhes</span>
+                            <span className="sr-only">Ver</span>
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -108,4 +117,4 @@ export default function OffersPage() {
       </Card>
     </div>
   )
-} 
+}

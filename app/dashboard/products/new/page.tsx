@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,14 +29,30 @@ import {
 import { useToast } from "@/components/ui/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useApiQuery } from "@/hooks/use-api-query"
+import { useApiMutation } from "@/hooks/use-api-mutation"
 
 export default function NewProductPage() {
   const [loading, setLoading] = useState(false)
-  const [categories, setCategories] = useState<Category[]>([])
-  const [currencies, setCurrencies] = useState<Currency[]>([])
-  const [availableDeliverables, setAvailableDeliverables] = useState<Deliverable[]>([])
-  const [availableGuidelines, setAvailableGuidelines] = useState<Guideline[]>([])
-  const [modifierTypes, setModifierTypes] = useState<ModifierType[]>([])
+  const router = useRouter()
+  const { toast } = useToast()
+  
+  const { data: categories = [] } = useApiQuery<Category[]>(getCategories)
+  const { data: currencies = [] } = useApiQuery<Currency[]>(getCurrencies)
+  const { data: availableDeliverables = [] } = useApiQuery<Deliverable[]>(getDeliverables)
+  const { data: availableGuidelines = [] } = useApiQuery<Guideline[]>(getGuidelines)
+  const { data: modifierTypes = [] } = useApiQuery<ModifierType[]>(getModifierTypes)
+  
+  const { mutate: createProductMutation, isLoading: isCreatingProduct } = useApiMutation(createProduct, {
+    onSuccess: () => {
+      toast({
+        title: "Sucesso",
+        description: "Produto criado com sucesso!",
+      })
+      router.push("/dashboard/products")
+    },
+  })
+
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -55,8 +71,6 @@ export default function NewProductPage() {
     }>
   >([{ id: "" }])
   const [selectedGuidelineIds, setSelectedGuidelineIds] = useState<string[]>([])
-  const router = useRouter()
-  const { toast } = useToast()
 
   const calculateAdjustedPrice = (basePrice: number, modifierTypeId: string | null) => {
     if (!modifierTypeId) return basePrice
@@ -81,29 +95,6 @@ export default function NewProductPage() {
         return basePrice
     }
   }
-
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [categoriesData, currenciesData, deliverablesData, modifierTypesData, guidelinesData] = await Promise.all(
-          [getCategories(), getCurrencies(), getDeliverables(), getModifierTypes(), getGuidelines()],
-        )
-        setCategories(categoriesData)
-        setCurrencies(currenciesData)
-        setAvailableDeliverables(deliverablesData)
-        setModifierTypes(modifierTypesData)
-        setAvailableGuidelines(guidelinesData)
-      } catch (error) {
-        toast({
-          title: "Erro",
-          description: "Não foi possível carregar os dados necessários.",
-          variant: "destructive",
-        })
-      }
-    }
-
-    loadData()
-  }, [toast])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -185,7 +176,6 @@ export default function NewProductPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
 
     try {
       // Validate required fields
@@ -198,65 +188,42 @@ export default function NewProductPage() {
       }
 
       // Validar duplicatas de combinação moeda/modificador
-      const priceMap = new Map()
+      const currencyModifierPairs = new Set()
       for (const price of formData.prices) {
-        const key = `${price.currencyId}-${price.modifierTypeId || 'default'}`
-        if (priceMap.has(key)) {
-          throw new Error("Não é permitido ter dois preços com a mesma combinação de moeda e modificador")
+        const pair = `${price.currencyId}|${price.modifierTypeId || 'null'}`
+        if (currencyModifierPairs.has(pair)) {
+          throw new Error("Não é possível ter preços duplicados para a mesma combinação de moeda e modificador")
         }
-        priceMap.set(key, true)
+        currencyModifierPairs.add(pair)
       }
 
-      // Filtrar entregáveis vazios
-      const validDeliverables = selectedDeliverables.filter((d) => d.id !== "")
+      // Processar entregáveis selecionados
+      const deliverables = selectedDeliverables
+        .filter((d) => d.id)
+        .map((d) => {
+          const deliverable = getDeliverableById(d.id)
+          return deliverable ? deliverable : { id: d.id, name: "", description: "" }
+        })
 
-      // Formatar entregáveis para o formato esperado pela API
-      const formattedDeliverables = validDeliverables.map((d) => {
-        const deliverable = getDeliverableById(d.id)
-        if (!deliverable) {
-          throw new Error(`Entregável com ID ${d.id} não encontrado`)
-        }
+      // Processar diretrizes selecionadas
+      const guidelines = selectedGuidelineIds
+        .map((id) => availableGuidelines.find((g) => g.id === id))
+        .filter((g): g is Guideline => g !== undefined)
 
-        return {
-          id: d.id,
-          name: deliverable.name,
-          description: deliverable.description,
-          productId: "", // Será preenchido pelo backend
-        }
-      })
-
-      // Get selected guidelines
-      const selectedGuidelines = availableGuidelines.filter((g) => selectedGuidelineIds.includes(g.id))
-
-      // Garantir que os tipos estão corretos antes de enviar
+      // Preparar dados do produto
       const productData = {
         ...formData,
-        prices: [
-          {
-            amount: Number(formData.prices[0].amount),
-            currencyId: formData.prices[0].currencyId,
-            modifierTypeId: formData.prices[0].modifierTypeId,
-          },
-        ],
-        deliverables: formattedDeliverables,
-        guidelines: selectedGuidelines,
+        deliverables,
+        guidelines,
       }
 
       console.log("Enviando dados do produto:", productData)
-
-      const newProduct = await createProduct(productData)
-      console.log("Produto criado com sucesso:", newProduct)
-
-      toast({
-        title: "Sucesso",
-        description: "Produto criado com sucesso.",
-      })
-      router.push("/dashboard/products")
+      createProductMutation(productData)
     } catch (error) {
       console.error("Erro ao criar produto:", error)
       toast({
         title: "Erro",
-        description: error instanceof Error ? error.message : "Não foi possível criar o produto.",
+        description: error instanceof Error ? error.message : "Ocorreu um erro ao criar o produto.",
         variant: "destructive",
       })
     } finally {

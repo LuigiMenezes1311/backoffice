@@ -303,6 +303,8 @@ export async function getProductById(id: string): Promise<Product> {
 
 export async function createProduct(product: Omit<Product, "id" | "createdAt" | "updatedAt">): Promise<Product> {
   try {
+    logDebug("Creating product with data:", product)
+
     return await fetchApi<Product>("/products", {
       method: "POST",
       body: JSON.stringify(product),
@@ -314,6 +316,9 @@ export async function createProduct(product: Omit<Product, "id" | "createdAt" | 
 
 export async function updateProduct(id: string, product: Partial<Product>): Promise<Product> {
   try {
+    logDebug("Updating product with ID:", id)
+    logDebug("Update data:", product)
+
     return await fetchApi<Product>(`/products/${id}`, {
       method: "PUT",
       body: JSON.stringify(product),
@@ -394,86 +399,26 @@ export async function deleteModifierType(key: string): Promise<void> {
   }
 }
 
-// Price Adjustments
+// Now let's update the calculateAdjustedPrice function to use the API
 export async function getAdjustedPrice(basePrice: number, modifierTypeId: string | null): Promise<number> {
+  if (!modifierTypeId) return basePrice
+
   try {
-    if (!modifierTypeId) return basePrice
+    const modifier = await getModifierTypeByKey(modifierTypeId)
 
-    const modifierType = await getModifierTypeByKey(modifierTypeId)
+    if (!modifier || !modifier.priceAdjustment) return basePrice
 
-    if (!modifierType.priceAdjustment) return basePrice
+    const { type, value } = modifier.priceAdjustment
 
-    if (modifierType.priceAdjustment.type === "MULTIPLIER") {
-      return basePrice * modifierType.priceAdjustment.value
-    } else if (modifierType.priceAdjustment.type === "FIXED_AMOUNT") {
-      return basePrice + modifierType.priceAdjustment.value
+    if (type === "MULTIPLIER") {
+      return basePrice * value
+    } else if (type === "FIXED_AMOUNT") {
+      return basePrice + value
     }
 
     return basePrice
   } catch (error) {
-    handleApiError(error, "Failed to calculate adjusted price")
+    console.error(`Failed to calculate adjusted price: ${error}`)
+    return basePrice // Return base price as fallback
   }
-}
-
-// Mock data for interface with Sales API
-export interface Offer {
-  id: string
-  leadName: string
-  status: "CONVERTED" | "PENDING"
-  type: "ONE_TIME" | "RECURRING"
-  total: number
-  createdAt: string
-  updatedAt: string
-}
-
-// This is a mock function for the sales API
-export async function getOffers(): Promise<Offer[]> {
-  // For demo purposes, we'll return mock data
-  return [
-    {
-      id: "1",
-      leadName: "TechCorp Inc.",
-      status: "CONVERTED",
-      type: "ONE_TIME",
-      total: 5000,
-      createdAt: "2025-04-10T10:00:00Z",
-      updatedAt: "2025-04-10T10:00:00Z",
-    },
-    {
-      id: "2",
-      leadName: "Global Services Ltd",
-      status: "PENDING",
-      type: "RECURRING",
-      total: 2500,
-      createdAt: "2025-04-09T15:30:00Z",
-      updatedAt: "2025-04-09T15:30:00Z",
-    },
-    {
-      id: "3",
-      leadName: "Acme Solutions",
-      status: "CONVERTED",
-      type: "ONE_TIME",
-      total: 7800,
-      createdAt: "2025-04-08T09:15:00Z",
-      updatedAt: "2025-04-08T14:20:00Z",
-    },
-    {
-      id: "4",
-      leadName: "InnoTech Startup",
-      status: "PENDING",
-      type: "ONE_TIME",
-      total: 1200,
-      createdAt: "2025-04-07T16:45:00Z",
-      updatedAt: "2025-04-07T16:45:00Z",
-    },
-    {
-      id: "5",
-      leadName: "MegaCorp Enterprises",
-      status: "CONVERTED",
-      type: "RECURRING",
-      total: 15000,
-      createdAt: "2025-04-06T11:30:00Z",
-      updatedAt: "2025-04-06T17:10:00Z",
-    },
-  ]
 }

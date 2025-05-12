@@ -2,6 +2,7 @@ import type React from "react"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { Package, Tag, Ticket, FileText } from "lucide-react"
+import { ApiErrorHandler } from "@/components/api-error-handler"
 
 const menuItems = [
   {
@@ -37,6 +38,7 @@ export default function DashboardLayout({
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+        <ApiErrorHandler />
       </div>
     </div>
   )
