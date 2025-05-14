@@ -1,4 +1,4 @@
-# Análise e Otimizações do Sistema
+# Análise e Otimizações do Sistema (Com vercel funcionando)
 
 ## Redundâncias Identificadas e Corrigidas
 
