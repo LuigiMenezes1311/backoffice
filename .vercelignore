@@ -1,0 +1,36 @@
+# Arquivos de desenvolvimento
+.git
+.github
+.vscode
+.next
+node_modules
+.env*.local
+
+# Arquivos de teste
+tests
+__tests__
+*.test.*
+*.spec.*
+
+# Arquivos de documentação
+README.md
+*.md
+LICENSE
+
+# Arquivos de configuração
+.eslintrc*
+.prettier*
+.editorconfig
+tsconfig.json
+jest.config.*
+
+# Arquivos de log
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Outros arquivos desnecessários para produção
+doc.txt
+sessions.json
+analise-otimizacoes.md 
